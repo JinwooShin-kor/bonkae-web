@@ -72,6 +72,11 @@
   <p class="sub">익명으로 잘 전달했어요.</p>
 </div>
 
+<div id="already" class="center" hidden>
+  <h2>이미 답하셨어요</h2>
+  <p class="sub">답변은 한 번만 보낼 수 있어요.<br>고맙습니다!</p>
+</div>
+
 <div id="gone" class="center" hidden>
   <h2>링크를 찾을 수 없어요</h2>
   <p class="sub">만료되었거나 잘못된 주소입니다.</p>
@@ -95,9 +100,23 @@ var TRAITS = [
 ];
 
 function show(id) {
-  ['loading', 'form', 'done', 'gone'].forEach(function (k) {
+  ['loading', 'form', 'done', 'gone', 'already'].forEach(function (k) {
     document.getElementById(k).hidden = k !== id;
   });
+}
+
+// 이 링크에 이미 답했는지 이 브라우저에 표시해 둔다.
+//
+// 응답자는 계정이 없어서 서버가 사람을 구분할 방법이 없다. 마음먹고 지우면 다시
+// 답할 수 있지만, 막아야 할 것은 그런 경우가 아니라 **새로고침 한 번에 두 번 세어지는 것**이다.
+var DONE_KEY = 'bonkae_peer_' + token;
+
+function alreadyAnswered() {
+  try { return localStorage.getItem(DONE_KEY) === '1'; } catch (e) { return false; }
+}
+
+function markAnswered() {
+  try { localStorage.setItem(DONE_KEY, '1'); } catch (e) {}
 }
 
 function buildQuestions() {
@@ -110,6 +129,7 @@ function buildQuestions() {
 
 async function load() {
   if (!token) return show('gone');
+  if (alreadyAnswered()) return show('already');
   try {
     var res = await fetch(API + '?t=' + encodeURIComponent(token));
     if (!res.ok) return show('gone');
@@ -145,6 +165,7 @@ document.getElementById('send').addEventListener('click', async function () {
       }),
     });
     if (!res.ok) throw new Error();
+    markAnswered();
     show('done');
   } catch (e) {
     btn.disabled = false;
