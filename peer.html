@@ -78,9 +78,12 @@
 </div>
 
 <script>
-// 정적 페이지라 서버가 값을 끼워 넣을 수 없다.
-// 이름은 Edge Function 에게 물어보고, 답변도 거기로 보낸다.
-var API = location.origin + '/functions/v1/peer';
+// 이 페이지는 Supabase 밖(정적 호스팅)에 있다.
+// Supabase 가 자기 도메인에서 HTML 을 text/plain 으로 덮어쓰기 때문이다.
+// 그래서 API 주소를 origin 에서 유추할 수 없고, 여기 적어 둔다.
+// (프로젝트 주소는 앱에도 들어가는 공개 값이다.)
+var SUPABASE = 'https://tqdpfwwkzdtyjzsuvpuc.supabase.co';
+var API = SUPABASE + '/functions/v1/peer';
 var token = new URLSearchParams(location.search).get('t') || '';
 
 var TRAITS = [
