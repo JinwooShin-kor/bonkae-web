@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>본캐 · 익명으로 답해주세요</title>
+<meta property="og:title" content="이 사람은 어떤 사람인가요?">
+<meta property="og:description" content="익명으로 30초만 답해주세요">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #0A0A0F; color: #F7F7FA;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Malgun Gothic", sans-serif;
+    padding: 36px 20px 56px; max-width: 520px; margin-inline: auto;
+    -webkit-text-size-adjust: 100%;
+  }
+  h1 { font-size: 25px; line-height: 1.4; margin: 0 0 10px; letter-spacing: -0.6px; }
+  .sub { color: #9A9AA8; font-size: 14px; line-height: 1.65; margin: 0 0 36px; }
+  .sub b { color: #F7F7FA; font-weight: 600; }
+  .q { margin-bottom: 30px; }
+  .label { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+  input[type=range] { width: 100%; accent-color: #6E5BFF; height: 30px; }
+  .ends { display: flex; justify-content: space-between; color: #62626F;
+          font-size: 12px; margin-top: -2px; }
+  textarea {
+    width: 100%; background: #15151C; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px; color: #F7F7FA; padding: 14px; font-size: 15px;
+    font-family: inherit; resize: vertical; min-height: 88px;
+  }
+  button {
+    width: 100%; margin-top: 26px; padding: 17px; border: 0; border-radius: 14px;
+    font-size: 16px; font-weight: 700; color: #fff;
+    background: linear-gradient(90deg,#6E5BFF,#A855F7); cursor: pointer;
+  }
+  button:disabled { opacity: .5; }
+  .note { color: #62626F; font-size: 12.5px; line-height: 1.6;
+          margin-top: 22px; text-align: center; }
+  .center { text-align: center; padding: 90px 0; }
+  .center h2 { font-size: 22px; margin: 0 0 12px; }
+  .brand { display: flex; align-items: center; gap: 9px; margin-bottom: 28px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%;
+         background: linear-gradient(135deg,#6E5BFF,#C6F24E); }
+  .brand span { font-weight: 800; letter-spacing: 1px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="center"><p class="sub">불러오는 중...</p></div>
+
+<div id="form" hidden>
+  <div class="brand"><div class="dot"></div><span>본캐</span></div>
+  <h1><span id="who"></span>님은<br>어떤 사람인가요?</h1>
+  <p class="sub">
+    솔직하게 답해 주세요. <b>누가 답했는지는 아무도 알 수 없어요.</b><br>
+    세 명 이상 모여야 결과가 열립니다.
+  </p>
+  <div id="questions"></div>
+
+  <p class="label" style="margin-top:36px">
+    한마디 남기기 <span style="color:#62626F;font-weight:400">(선택)</span>
+  </p>
+  <textarea id="note" maxlength="200" placeholder="예: 생각보다 겁이 없어요"></textarea>
+
+  <button id="send">보내기</button>
+  <p class="note">이 답변은 익명으로 전달됩니다</p>
+</div>
+
+<div id="done" class="center" hidden>
+  <h2>고마워요!</h2>
+  <p class="sub">익명으로 잘 전달했어요.</p>
+</div>
+
+<div id="gone" class="center" hidden>
+  <h2>링크를 찾을 수 없어요</h2>
+  <p class="sub">만료되었거나 잘못된 주소입니다.</p>
+</div>
+
+<script>
+// 정적 페이지라 서버가 값을 끼워 넣을 수 없다.
+// 이름은 Edge Function 에게 물어보고, 답변도 거기로 보낸다.
+var API = location.origin + '/functions/v1/peer';
+var token = new URLSearchParams(location.search).get('t') || '';
+
+var TRAITS = [
+  ['openness', '새로운 걸 잘 받아들여요', '익숙한 걸 선호', '새로움을 즐김'],
+  ['conscientiousness', '계획적이고 꼼꼼해요', '즉흥적', '계획적'],
+  ['extraversion', '사람들과 어울리길 좋아해요', '혼자가 편함', '사람이 좋음'],
+  ['agreeableness', '남을 먼저 배려해요', '할 말은 함', '배려가 먼저'],
+  ['sensitivity', '감정이 섬세하고 잘 느껴요', '무던함', '섬세함'],
+];
+
+function show(id) {
+  ['loading', 'form', 'done', 'gone'].forEach(function (k) {
+    document.getElementById(k).hidden = k !== id;
+  });
+}
+
+function buildQuestions() {
+  document.getElementById('questions').innerHTML = TRAITS.map(function (t) {
+    return '<div class="q"><p class="label">' + t[1] + '</p>' +
+      '<input type="range" min="0" max="100" value="50" name="' + t[0] + '">' +
+      '<div class="ends"><span>' + t[2] + '</span><span>' + t[3] + '</span></div></div>';
+  }).join('');
+}
+
+async function load() {
+  if (!token) return show('gone');
+  try {
+    var res = await fetch(API + '?t=' + encodeURIComponent(token));
+    if (!res.ok) return show('gone');
+    var data = await res.json();
+    // 이름은 textContent 로 넣는다. innerHTML 로 넣으면 남이 적은 이름이 코드가 된다.
+    document.getElementById('who').textContent = data.name || '이 사람';
+    document.title = (data.name || '이 사람') + '님은 어떤 사람인가요?';
+    buildQuestions();
+    show('form');
+  } catch (e) {
+    show('gone');
+  }
+}
+
+document.getElementById('send').addEventListener('click', async function () {
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = '보내는 중...';
+
+  var scores = {};
+  TRAITS.forEach(function (t) {
+    scores[t[0]] = Number(document.getElementsByName(t[0])[0].value);
+  });
+
+  try {
+    var res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: token,
+        scores: scores,
+        note: document.getElementById('note').value.trim() || null,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    show('done');
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '다시 보내기';
+    alert('전달하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+});
+
+load();
+</script>
+</body>
+</html>
