@@ -62,6 +62,11 @@
     한마디 남기기 <span style="color:#62626F;font-weight:400">(선택)</span>
   </p>
   <textarea id="note" maxlength="200" placeholder="예: 생각보다 겁이 없어요"></textarea>
+  <!-- 거르개가 있다는 것을 미리 알린다. 보내고 나서 알면 늦다. -->
+  <p class="note" style="margin-top:8px;text-align:left">
+    욕설·비방이나 주소·연락처가 들어간 글은 전달되지 않아요.
+    받는 사람이 신고할 수도 있습니다.
+  </p>
 
   <button id="send">보내기</button>
   <p class="note">이 답변은 익명으로 전달됩니다</p>
@@ -70,6 +75,15 @@
 <div id="done" class="center" hidden>
   <h2>고마워요!</h2>
   <p class="sub">익명으로 잘 전달했어요.</p>
+</div>
+
+<!-- 눈금은 갔고 글만 걸렸을 때. 말없이 지우면 자기 글이 전해진 줄 안다. -->
+<div id="filtered" class="center" hidden>
+  <h2>눈금만 전달했어요</h2>
+  <p class="sub">
+    남기신 글은 전달 규정에 맞지 않아 함께 보내지 못했어요.<br>
+    평가해 주신 다섯 눈금은 잘 전달했습니다.
+  </p>
 </div>
 
 <div id="already" class="center" hidden>
@@ -100,7 +114,7 @@ var TRAITS = [
 ];
 
 function show(id) {
-  ['loading', 'form', 'done', 'gone', 'already'].forEach(function (k) {
+  ['loading', 'form', 'done', 'filtered', 'gone', 'already'].forEach(function (k) {
     document.getElementById(k).hidden = k !== id;
   });
 }
@@ -165,8 +179,10 @@ document.getElementById('send').addEventListener('click', async function () {
       }),
     });
     if (!res.ok) throw new Error();
+    var out = await res.json();
     markAnswered();
-    show('done');
+    // 글이 걸러졌으면 그 사실을 알린다. 눈금은 이미 저장됐으므로 다시 보내지 않는다.
+    show(out && out.filtered ? 'filtered' : 'done');
   } catch (e) {
     btn.disabled = false;
     btn.textContent = '다시 보내기';
